@@ -13,6 +13,15 @@ const ACTIONS = [
 const GOAL_X = 370;
 const GOAL_HALF_HEIGHT = 64;
 
+// Nagrody licza sie RAZ NA DECYZJE (okno kilku tickow), nie raz na tick - patrz
+// actor-1v1.js. Kara za czas jest teraz per-decyzja, wiec calkowita kara za caly
+// mecz do limitu krokow jest wyraznie mniejsza niz utrata gola (patrz TIMEOUT_PENALTY),
+// zamiast (jak wczesniej) niemal rownowazna stracie punktu.
+const STEP_PENALTY = -0.5;
+const TOUCH_REWARD = 15;
+const GOAL_REWARD = 500;
+const TIMEOUT_PENALTY = -30;
+
 // 9 pierwszych cech ma DOKŁADNIE to samo znaczenie i kolejność co w modelu 1-botowym
 // (dqn-common.js) - żeby dało się przenieść już wyuczone wagi. 5 nowych na końcu
 // (przeciwnik) zostaje losowo zainicjalizowanych przy migracji.
@@ -79,34 +88,44 @@ function ballDistToGoal(ballX, ballY, team) {
   return Math.hypot(targetX - ballX, targetY - ballY);
 }
 
-function computeReward(prevState, newState, team) {
+// prevState/newState to teraz stan PRZED i PO calym oknie decyzji (kilka
+// tickow), nie pojedynczy tick - patrz actor-1v1.js. touchedDuringWindow -
+// czy bot dotknal pilki w KTORYMKOLWIEK ticku tego okna (liczone przez
+// wywolujacego, bo tylko on widzi kazdy pojedynczy tick). isTimeout=true
+// oznacza, ze to byla ostatnia decyzja przed limitem krokow - wtedy epizod
+// KONCZY SIE tu (done=true), zeby siec nie uczyla sie fantomowej "dalszej
+// gry" z nastepnego, w rzeczywistosci juz nowego epizodu.
+function computeReward(prevState, newState, team, isTimeout, touchedDuringWindow) {
   const prevOwn = getOwnAndOpponent(prevState, team);
   const newOwn = getOwnAndOpponent(newState, team);
 
   const prevDist = Math.hypot(prevState.ballX - prevOwn.selfX, prevState.ballY - prevOwn.selfY);
   const newDist = Math.hypot(newState.ballX - newOwn.selfX, newState.ballY - newOwn.selfY);
-  const touchDistance = newState.ballRadius + newOwn.selfRadius + 3;
-  const justTouched = newDist < touchDistance && prevDist >= touchDistance;
 
-  let reward = -0.5;
+  let reward = STEP_PENALTY;
   reward += (prevDist - newDist) * 5;
 
   const prevBallGoalDist = ballDistToGoal(prevState.ballX, prevState.ballY, team);
   const newBallGoalDist = ballDistToGoal(newState.ballX, newState.ballY, team);
   reward += (prevBallGoalDist - newBallGoalDist) * 5;
 
-  if (justTouched) reward += 20;
+  if (touchedDuringWindow) reward += TOUCH_REWARD;
 
   if (newState.scoredBy === team) {
-    reward += 500;
-    return { reward, done: true };
+    reward += GOAL_REWARD;
+    return { reward, done: true, touched: touchedDuringWindow };
   }
   if (newState.scoredBy !== null && newState.scoredBy !== team) {
-    reward -= 500;
-    return { reward, done: true };
+    reward -= GOAL_REWARD;
+    return { reward, done: true, touched: touchedDuringWindow };
   }
 
-  return { reward, done: false };
+  if (isTimeout) {
+    reward += TIMEOUT_PENALTY;
+    return { reward, done: true, touched: touchedDuringWindow };
+  }
+
+  return { reward, done: false, touched: touchedDuringWindow };
 }
 
 function createModel() {
@@ -124,4 +143,8 @@ module.exports = {
   getFeatures,
   computeReward,
   createModel,
+  STEP_PENALTY,
+  TOUCH_REWARD,
+  GOAL_REWARD,
+  TIMEOUT_PENALTY,
 };
