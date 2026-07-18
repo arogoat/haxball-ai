@@ -13,6 +13,15 @@ while true; do
   echo "$(date '+%Y-%m-%d %H:%M:%S') - startuje learner-1v1.js"
   node learner-1v1.js
   code=$?
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - learner-1v1.js zakonczony (kod $code), restart za 5s"
+  if [ "$code" -eq 0 ]; then
+    # Kod 0 = learner sam sie zakonczyl PO OSIAGNIECIU TOTAL_EPISODES (celowo,
+    # patrz proces.exit(0) w learner-1v1.js). Bez tego rozroznienia petla
+    # restartowala go w kolko, a kazdy restart odpalal sie na chwile, widzial
+    # ze limit juz przekroczony i od razu konczyl - epizody rosly w nieskonczonosc
+    # (30007 -> 30141 -> ...) mimo "zakonczonego" treningu.
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - learner-1v1.js zakonczony poprawnie (limit epizodow osiagniety) - nie restartuje"
+    break
+  fi
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - learner-1v1.js padl (kod $code), restart za 5s"
   sleep 5
 done
