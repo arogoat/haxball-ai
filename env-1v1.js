@@ -53,6 +53,15 @@ function createEnv1v1(token, onReady) {
 
       room.onRoomLink = (link) => {
         console.log("Otwórz w przeglądarce, żeby oglądać:", link);
+        // Linki gina w zalewie logow telemetrii (i ograniczonym buforze tmux),
+        // wiec zapisujemy je tez do pliku - zawsze mozna je podejrzec przez:
+        //   cat room-links-1v1.txt
+        try {
+          require("fs").appendFileSync(
+            "room-links-1v1.txt",
+            `${new Date().toISOString()} pid=${process.pid} ${link}\n`
+          );
+        } catch (e) { /* brak zapisu do pliku nie moze psuc treningu */ }
       };
 
       const stadiums = Utils.getDefaultStadiums();
