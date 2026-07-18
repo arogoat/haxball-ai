@@ -77,6 +77,7 @@ function createEnv1v1(token, onReady) {
       // (README: "link: current url of the room") - wiec zamiast liczyc na
       // event, odpytujemy ja co 2s az bedzie dostepna i zapisujemy raz.
       let linkSaved = false;
+      let linkPollAttempts = 0;
       const linkPoll = setInterval(() => {
         if (linkSaved) { clearInterval(linkPoll); return; }
         // room.link jest skladane od razu, ale ID pokoju (?c=...) przychodzi
@@ -86,6 +87,14 @@ function createEnv1v1(token, onReady) {
           linkSaved = true;
           clearInterval(linkPoll);
           onRoomLink(room.link);
+          return;
+        }
+        linkPollAttempts++;
+        if (linkPollAttempts === 30) {
+          // ~60s bez ID = pokoj nie zarejestrowal sie na serwerze haxball.
+          // Trening dziala dalej (fizyka jest w pelni lokalna), ale pokoju NIE
+          // DA SIE ogladac. Jedyna znana przyczyna: wygasly/nieprawidlowy token.
+          console.log("UWAGA: pokoj nie dostal ID po 60s - token najpewniej wygasl. Trening dziala, ale podgladu nie bedzie. Wygeneruj swieze tokeny: https://www.haxball.com/headlesstoken i podmien w tokens.js");
         }
       }, 2000);
 
