@@ -18,7 +18,7 @@ const WEIGHTS_PATH = "dqn-weights-1v1.json";
 const PROGRESS_PATH = "training-progress-1v1.json";
 const SYNC_EVERY_MS = 2000;
 const TRAIN_EVERY_N_EXPERIENCES = 4;
-const TOTAL_EPISODES = 5000; // łącznie, ze wszystkich aktorów, ZE WSZYSTKICH URUCHOMIEŃ
+const TOTAL_EPISODES = 30000; // łącznie, ze wszystkich aktorów, ZE WSZYSTKICH URUCHOMIEŃ - starczy na całą noc
 // STAŁE tempo zanikania epsilon na aktora - nie zależy od TOTAL_EPISODES (patrz
 // haxball-ai-weight-migration w pamięci projektu - to samo co poprawka w learner.js)
 const EPSILON_DECAY_EPISODES_PER_ACTOR = 150;
