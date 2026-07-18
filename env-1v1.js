@@ -72,6 +72,20 @@ function createEnv1v1(token, onReady) {
       room.onRoomLink = onRoomLink;
       room.onAfterRoomLink = onRoomLink;
 
+      // Pas bezpieczenstwa: zdarzenia linku bywaja zawodne (nie odpalaly mimo
+      // dzialajacych pokojow), a room.link to zwykla wlasciwosc read-only
+      // (README: "link: current url of the room") - wiec zamiast liczyc na
+      // event, odpytujemy ja co 2s az bedzie dostepna i zapisujemy raz.
+      let linkSaved = false;
+      const linkPoll = setInterval(() => {
+        if (linkSaved) { clearInterval(linkPoll); return; }
+        if (room.link) {
+          linkSaved = true;
+          clearInterval(linkPoll);
+          onRoomLink(room.link);
+        }
+      }, 2000);
+
       const stadiums = Utils.getDefaultStadiums();
       room.setCurrentStadium(stadiums.find(s => s.name === "Classic"));
       room.fakePlayerJoin(RED_ID, "Red", "pl", "🔴", "fake-conn-1", "fake-auth-1");
