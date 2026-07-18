@@ -128,12 +128,23 @@ function computeReward(prevState, newState, team, isTimeout, touchedDuringWindow
   return { reward, done: false, touched: touchedDuringWindow };
 }
 
+// Huber zamiast MSE: przy MSE loss rosl liniowo bez splaszczenia (20 -> 400 w
+// pierwszych 300 epizodach, mimo ze nagroda przestala rosnac po ~140) - klasyczny
+// objaw tego, ze duze bledy TD (gol = +/-500, gamma=0.99 kumuluje sie na dlugim
+// horyzoncie) dominuja gradient i psuja stabilnosc zamiast dawac siec szanse na
+// spokojne dostrojenie. Huber tlumi wplyw duzych bledow (dokladnie po to powstal,
+// standard w DQN od czasow oryginalnej pracy DeepMind). Lekko nizszy LR (0.0005
+// zamiast 0.001) dla dodatkowej stabilnosci przy tak duzej skali nagrod.
+function huberLoss(yTrue, yPred) {
+  return tf.losses.huberLoss(yTrue, yPred, undefined, 1.0);
+}
+
 function createModel() {
   const model = tf.sequential();
   model.add(tf.layers.dense({ units: 24, activation: "relu", inputShape: [FEATURE_COUNT] }));
   model.add(tf.layers.dense({ units: 24, activation: "relu" }));
   model.add(tf.layers.dense({ units: ACTIONS.length, activation: "linear" }));
-  model.compile({ optimizer: tf.train.adam(0.001), loss: "meanSquaredError" });
+  model.compile({ optimizer: tf.train.adam(0.0005), loss: huberLoss });
   return model;
 }
 
