@@ -66,7 +66,11 @@ function createEnv1v1(token, onReady) {
     onRoomLink,
     onOpen: (r) => {
       room = r;
+      // Podpinamy obie odmiany zdarzenia - oficjalny przyklad node-haxball uzywa
+      // onAfterRoomLink (nie onRoomLink) i w praktyce to wlasnie ono odpala
+      // niezawodnie. Zostawiamy tez onRoomLink na wypadek roznic miedzy wersjami.
       room.onRoomLink = onRoomLink;
+      room.onAfterRoomLink = onRoomLink;
 
       const stadiums = Utils.getDefaultStadiums();
       room.setCurrentStadium(stadiums.find(s => s.name === "Classic"));
