@@ -79,7 +79,10 @@ function createEnv1v1(token, onReady) {
       let linkSaved = false;
       const linkPoll = setInterval(() => {
         if (linkSaved) { clearInterval(linkPoll); return; }
-        if (room.link) {
+        // room.link jest skladane od razu, ale ID pokoju (?c=...) przychodzi
+        // dopiero po rejestracji na serwerze haxball - wczesniej w linku jest
+        // doslownie "null". Czekamy na kompletny link.
+        if (room.link && !room.link.includes("null")) {
           linkSaved = true;
           clearInterval(linkPoll);
           onRoomLink(room.link);
