@@ -9,8 +9,11 @@ git add dqn-weights-1v1.json training-progress-1v1.json dqn-weights-goal.json tr
 
 if ! git diff --cached --quiet; then
   git commit -m "Auto-sync wynikow treningu $(date '+%Y-%m-%d %H:%M')" --quiet
-  git push --quiet
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - wypchnieto zmiany"
+  if git push --quiet; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - wypchnieto zmiany"
+  else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - BLAD: push nie powiodl sie (sprawdz autoryzacje gita)"
+  fi
 else
   echo "$(date '+%Y-%m-%d %H:%M:%S') - brak zmian, pomijam"
 fi

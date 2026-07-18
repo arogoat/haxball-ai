@@ -121,6 +121,17 @@ const actors = TOKENS.map((token, i) => {
     d.toString().split("\n").filter(Boolean).forEach((l) => console.error(`[mecz ${i}] BŁĄD: ${l}`));
   });
 
+  // Bez tego, jeśli aktor padnie (crash / zamknięty kanał IPC), kolejna próba
+  // child.send() w setInterval niżej rzuca nieobsłużony błąd i ubija CAŁY
+  // proces learnera - razem z pozostałymi, wciąż żywymi aktorami. Teraz
+  // martwy aktor tylko przestaje uczestniczyć, reszta gra dalej.
+  child.on("error", (err) => {
+    console.error(`[mecz ${i}] proces zerwał połączenie: ${err.message}`);
+  });
+  child.on("exit", (code, signal) => {
+    console.error(`[mecz ${i}] proces zakończony (kod ${code}${signal ? `, sygnał ${signal}` : ""})`);
+  });
+
   child.on("message", async (msg) => {
     if (stopped) return;
 
@@ -159,7 +170,7 @@ const actors = TOKENS.map((token, i) => {
         console.log(`[uczący się 1v1] osiągnięto ${TOTAL_EPISODES} epizodów łącznie - kończę.`);
         saveWeights();
         saveProgress(totalEpisodesNow);
-        actors.forEach(({ child }) => child.send({ type: "stop" }));
+        actors.forEach(({ child }) => { if (child.connected) child.send({ type: "stop" }); });
         setTimeout(() => process.exit(0), 500);
       }
     }
@@ -171,7 +182,7 @@ const actors = TOKENS.map((token, i) => {
 setInterval(() => {
   if (stopped) return;
   const weights = model.getWeights().map((w) => w.arraySync());
-  actors.forEach(({ child }) => child.send({ type: "weights", weights }));
+  actors.forEach(({ child }) => { if (child.connected) child.send({ type: "weights", weights }); });
 }, SYNC_EVERY_MS);
 
 console.log(`[uczący się 1v1] wystartowano z ${TOKENS.length} aktorami (${TOKENS.length} równoległych meczów 1v1)`);
