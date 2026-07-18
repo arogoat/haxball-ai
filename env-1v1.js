@@ -20,6 +20,11 @@ function createEnv1v1(token, onReady) {
     const ball = room.getBall();
     const red = room.getPlayerDisc(RED_ID);
     const blue = room.getPlayerDisc(BLUE_ID);
+    // W trakcie automatycznego restartu meczu (onGameStop -> startGame) discs
+    // graczy bywają chwilowo niedostępne, zanim silnik je odtworzy. Zamiast
+    // crashować cały proces aktora (i przez to cały learner przez zerwane IPC),
+    // zwracamy null - onGameTick po prostu poczeka na kolejny, poprawny tick.
+    if (!ball || !red || !blue) return null;
     const scored = scoredBy;
     scoredBy = null;
     return {
@@ -74,9 +79,12 @@ function createEnv1v1(token, onReady) {
       };
 
       room.onGameTick = () => {
+        if (tickWaiters.length === 0) return;
+        const state = readState();
+        if (!state) return; // discs jeszcze nie gotowe - spróbujemy przy następnym ticku
         const waiters = tickWaiters;
         tickWaiters = [];
-        waiters.forEach((resolve) => resolve(readState()));
+        waiters.forEach((resolve) => resolve(state));
       };
 
       onReady({
