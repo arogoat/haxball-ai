@@ -19,6 +19,13 @@ const PROGRESS_PATH = "training-progress-1v1.json";
 const SYNC_EVERY_MS = 2000;
 const TRAIN_EVERY_N_EXPERIENCES = 4;
 const TOTAL_EPISODES = 30000; // łącznie, ze wszystkich aktorów, ZE WSZYSTKICH URUCHOMIEŃ - starczy na całą noc
+// Wagi zapisują się normalnie tylko przy nowym rekordzie decisive-rate - jeśli
+// wynik utknie w miejscu (tak jak się zdarzyło - 50% od epizodu ~4840 do 30000),
+// zapis w ogóle się nie odpala przez resztę nocy. Gdyby proces padł przed
+// końcem, stracilibyśmy cały ten postęp. Ten checkpoint zapisuje wagi co jakiś
+// czas NIEZALEŻNIE od rekordu, żeby crash nigdy nie kosztował więcej niż tyle
+// epizodów, ile wynosi ten interwał.
+const SAVE_CHECKPOINT_EVERY = 500;
 // STAŁE tempo zanikania epsilon na aktora - nie zależy od TOTAL_EPISODES (patrz
 // haxball-ai-weight-migration w pamięci projektu - to samo co poprawka w learner.js)
 const EPSILON_DECAY_EPISODES_PER_ACTOR = 150;
@@ -73,6 +80,7 @@ const replayBuffer = [];
 let experienceCountSinceTrain = 0;
 const episodeResults = []; // { winner: 1 | 2 | null }
 let training = false;
+let lastCheckpointEpisode = episodesBefore;
 
 async function trainStep() {
   if (training) return;
@@ -160,7 +168,12 @@ const actors = TOKENS.map((token, i) => {
         if (decisiveRate > bestSuccessRate) {
           bestSuccessRate = decisiveRate;
           saveWeights();
+          lastCheckpointEpisode = totalEpisodesNow;
           console.log(`[uczący się 1v1]  -> nowy rekord (${(decisiveRate * 100).toFixed(0)}% meczów z golem), zapisuję wagi`);
+        } else if (totalEpisodesNow - lastCheckpointEpisode >= SAVE_CHECKPOINT_EVERY) {
+          saveWeights();
+          lastCheckpointEpisode = totalEpisodesNow;
+          console.log(`[uczący się 1v1]  -> checkpoint co ${SAVE_CHECKPOINT_EVERY} epizodów (bez nowego rekordu), zapisuję wagi`);
         }
         saveProgress(totalEpisodesNow);
       }
