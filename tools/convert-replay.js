@@ -85,8 +85,12 @@ const reader = Replay.read(data, {
         console.log("=== przykladowy gracz (klucze):", Object.keys(players[0]));
         console.log("=== gracz.disc:", JSON.stringify(players[0].disc ?? null)?.slice(0, 300));
       }
+      finish(); // inspekcja = pierwszy tick wystarczy, nie mielimy calego nagrania
       return;
     }
+
+    const fr = reader.getCurrentFrameNo();
+    if (fr % 10000 === 0) console.log(`  ...klatka ${fr}/${reader.maxFrameNo}`);
 
     const players = firstDefined(state.players, state.playerList) || [];
     const row = {
@@ -115,8 +119,6 @@ const reader = Replay.read(data, {
 
     if (row.ball && row.players.length > 0) rows.push(row);
   },
-  onEnd: () => finish(),
-  onDestinationTimeReached: () => finish(),
 }, {
   // wlasny scheduler - przelatujemy nagranie tak szybko, jak da rade CPU,
   // zamiast czekac w czasie rzeczywistym
@@ -137,6 +139,11 @@ function finish() {
   reader.destroy();
   process.exit(0);
 }
+
+// Wg dokumentacji onEnd/onDestinationTimeReached to callbacki OBIEKTU readera
+// (przypisywane po utworzeniu), nie wpisy w liscie callbackow zdarzen gry.
+reader.onEnd = () => finish();
+reader.onDestinationTimeReached = () => finish();
 
 console.log(`Nagranie: ${inputPath}, dlugosc: ${(reader.length() / 1000).toFixed(0)}s, klatek: ${reader.maxFrameNo}`);
 reader.setSpeed(1000000);
