@@ -11,3 +11,4 @@ python/checkpoints/
 python/logs/
 python/recordings/
 __pycache__/
+replays/*.jsonl
