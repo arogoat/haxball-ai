@@ -65,10 +65,13 @@ def main():
 
     env = make_eval_env(record=not args.no_rec)
 
+    record = not args.no_rec
     red_wins = blue_wins = draws = 0
     lengths = []
     for game_i in range(args.games):
-        obs_all = env.reset()
+        # save_recording=True zapisuje nagranie POPRZEDNIEGO epizodu (tak dziala
+        # haxballgym) - przy pierwszym reset nie ma czego zapisywac
+        obs_all = env.reset(save_recording=record and game_i > 0)
         done = False
         steps = 0
         info = {}
@@ -98,6 +101,9 @@ def main():
             draws += 1
             result = "remis"
         print(f"mecz {game_i + 1}: {result} ({red_s}:{blue_s}, {steps} krokow)")
+
+    if record:
+        env.reset(save_recording=True)  # zapis nagrania ostatniego meczu
 
     n = args.games
     print()
