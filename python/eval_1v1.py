@@ -56,7 +56,10 @@ def main():
     parser.add_argument("--opponent", default=None, help='sciezka do zip albo "random"')
     parser.add_argument("--games", type=int, default=20)
     parser.add_argument("--no-rec", action="store_true")
+    parser.add_argument("--stochastic", action="store_true",
+                        help="akcje losowane z rozkladu polityki (jak w treningu) zamiast deterministycznych - dwie identyczne deterministyczne sieci potrafia wpasc w patowa petle")
     args = parser.parse_args()
+    det = not args.stochastic
 
     from stable_baselines3 import PPO
 
@@ -80,11 +83,11 @@ def main():
         steps = 0
         info = {}
         while not done:
-            red_action, _ = model.predict(np.asarray(obs_all[0], dtype=np.float32), deterministic=True)
+            red_action, _ = model.predict(np.asarray(obs_all[0], dtype=np.float32), deterministic=det)
             if opponent is None:
                 blue_action = env.action_space.sample()
             else:
-                blue_action, _ = opponent.predict(np.asarray(obs_all[1], dtype=np.float32), deterministic=True)
+                blue_action, _ = opponent.predict(np.asarray(obs_all[1], dtype=np.float32), deterministic=det)
             obs_all, _, done, info = env.step([np.asarray(red_action), np.asarray(blue_action)])
             steps += 1
         lengths.append(steps)
