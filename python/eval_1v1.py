@@ -20,13 +20,11 @@ from selfplay_env import TICK_SKIP, EPISODE_STEPS  # noqa: E402
 def make_eval_env(record: bool):
     from ursinaxball import Game
     import haxballgym
-    from haxballgym.utils.terminal_conditions.common_conditions import (
-        TimeoutCondition,
-        GoalScoredCondition,
-    )
+    from haxballgym.utils.terminal_conditions.common_conditions import TimeoutCondition
     from obs import NormalizedObs
     from rewards import ShapedReward
     from state_setters import RandomState
+    from terminal_conditions import FixedGoalScoredCondition
 
     if record:
         os.makedirs(RECORDINGS_DIR, exist_ok=True)
@@ -46,7 +44,7 @@ def make_eval_env(record: bool):
         # te same losowe starty co w treningu - mecze eval sa dzieki temu
         # rozne (deterministyczna polityka + staly start = 10x identyczny mecz)
         state_setter=RandomState(kickoff_prob=0.2),
-        terminal_conditions=[TimeoutCondition(EPISODE_STEPS), GoalScoredCondition()],
+        terminal_conditions=[TimeoutCondition(EPISODE_STEPS), FixedGoalScoredCondition()],
     )
 
 

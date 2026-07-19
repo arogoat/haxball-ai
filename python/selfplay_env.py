@@ -24,14 +24,12 @@ _OBS_SIZE = 15
 def _make_haxball_env():
     from ursinaxball import Game
     import haxballgym
-    from haxballgym.utils.terminal_conditions.common_conditions import (
-        TimeoutCondition,
-        GoalScoredCondition,
-    )
+    from haxballgym.utils.terminal_conditions.common_conditions import TimeoutCondition
 
     from obs import NormalizedObs
     from rewards import ShapedReward
     from state_setters import RandomState
+    from terminal_conditions import FixedGoalScoredCondition
 
     game = Game(
         enable_renderer=False,
@@ -46,7 +44,7 @@ def _make_haxball_env():
         reward_fn=ShapedReward(),
         obs_builder=NormalizedObs(),
         state_setter=RandomState(kickoff_prob=0.2),
-        terminal_conditions=[TimeoutCondition(EPISODE_STEPS), GoalScoredCondition()],
+        terminal_conditions=[TimeoutCondition(EPISODE_STEPS), FixedGoalScoredCondition()],
     )
 
 
