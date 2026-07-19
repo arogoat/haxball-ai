@@ -13,17 +13,40 @@
 // stanu moga sie roznic miedzy wersjami - przy pierwszym uruchomieniu na
 // prawdziwym pliku uzyj --inspect i w razie potrzeby dopasujemy akcesory.
 const fs = require("fs");
-const { Replay } = require("node-haxball")();
 
 const inputPath = process.argv[2];
 const outArg = process.argv[3];
 if (!inputPath) {
-  console.error("Uzycie: node tools/convert-replay.js <plik.hbr2> [wyjscie.jsonl|--inspect]");
+  console.error("Uzycie: node tools/convert-replay.js <plik.hbr2|folder> [wyjscie.jsonl|--inspect]");
+  console.error("  Folder: konwertuje wszystkie .hbr2 w srodku (pomija juz przekonwertowane).");
   process.exit(1);
 }
+
+// TRYB WSADOWY: folder z wieloma nagraniami - kazdy plik przerabiamy w osobnym
+// procesie (czysty stan readera), sekwencyjnie, z pominieciem juz zrobionych.
+if (fs.existsSync(inputPath) && fs.statSync(inputPath).isDirectory()) {
+  const { spawnSync } = require("child_process");
+  const files = fs.readdirSync(inputPath).filter((f) => /\.hbr2?$/i.test(f)).sort();
+  if (files.length === 0) {
+    console.error(`Brak plikow .hbr2 w ${inputPath}`);
+    process.exit(1);
+  }
+  let done = 0, skipped = 0, failed = 0;
+  for (const f of files) {
+    const src = require("path").join(inputPath, f);
+    const dst = src.replace(/\.hbr2?$/i, "") + ".jsonl";
+    if (fs.existsSync(dst)) { skipped++; continue; }
+    const res = spawnSync(process.execPath, [__filename, src, dst], { stdio: "inherit", timeout: 660000 });
+    if (res.status === 0) done++; else { failed++; console.error(`BLAD przy ${f} (kod ${res.status})`); }
+  }
+  console.log(`\nGotowe: ${done} przekonwertowanych, ${skipped} pominietych (juz istnialy), ${failed} bledow.`);
+  process.exit(failed > 0 ? 1 : 0);
+}
+
 const inspectMode = outArg === "--inspect";
 const outPath = inspectMode ? null : (outArg || inputPath.replace(/\.hbr2?$/i, "") + ".jsonl");
 
+const { Replay } = require("node-haxball")();
 const data = fs.readFileSync(inputPath, null);
 
 // aktualny stan klawiszy kazdego gracza (aktualizowany zdarzeniami)
