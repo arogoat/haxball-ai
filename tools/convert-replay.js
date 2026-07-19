@@ -49,6 +49,32 @@ const outPath = inspectMode ? null : (outArg || inputPath.replace(/\.hbr2?$/i, "
 const { Replay } = require("node-haxball")();
 const data = fs.readFileSync(inputPath, null);
 
+// TRYB INSPEKCJI: synchroniczny parse calego pliku przez Replay.readAll -
+// zadnych callbackow i odtwarzania, po prostu struktura danych na stol.
+if (inspectMode) {
+  const rd = Replay.readAll(data);
+  console.log("=== ReplayData (klucze):", Object.keys(rd));
+  console.log("=== totalFrames:", rd.totalFrames, "version:", rd.version);
+  const room = rd.roomData;
+  console.log("=== roomData (klucze):", Object.keys(room || {}));
+  console.log("=== stadion:", room?.stadium?.name ?? "(brak pola stadium.name)");
+  const players = room?.players;
+  if (players && players.length) {
+    console.log("=== graczy w roomData:", players.length);
+    console.log("=== przykladowy gracz (klucze):", Object.keys(players[0]));
+    console.log("=== gracz JSON (400 znakow):", JSON.stringify(players[0]).slice(0, 400));
+  }
+  const events = rd.events;
+  if (events && events.length) {
+    console.log("=== zdarzen:", events.length);
+    const sample = events.slice(0, 8).map((e) => ({ frameNo: e.frameNo, keys: Object.keys(e) }));
+    console.log("=== pierwsze zdarzenia:", JSON.stringify(sample, null, 1).slice(0, 800));
+  }
+  const gs = room?.gameState;
+  console.log("=== roomData.gameState (klucze):", gs ? Object.keys(gs) : null);
+  process.exit(0);
+}
+
 // aktualny stan klawiszy kazdego gracza (aktualizowany zdarzeniami)
 const currentInputs = {};
 const rows = [];
