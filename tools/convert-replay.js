@@ -3,29 +3,30 @@
 //
 // Uzycie (na serwerze, w katalogu glownym repo - potrzebuje node_modules):
 //   node tools/convert-replay.js sciezka/do/nagrania.hbr2 [wyjscie.jsonl]
-//   node tools/convert-replay.js sciezka/do/nagrania.hbr2 --inspect   # podglad struktury stanu
+//   node tools/convert-replay.js replays/            # wszystkie .hbr2 w folderze
+//   node tools/convert-replay.js plik.hbr2 --inspect # podglad struktury pliku
 //
-// Kazda linia wyjscia: { f: nrKlatki, score: [red, blue], ball: {x,y,vx,vy},
-//   players: [{ id, team, x, y, vx, vy, input }] }
-// input = bitmaska klawiszy haxballa (1=gora, 2=dol, 4=lewo, 8=prawo, 16=kop).
+// Format wyjscia:
+//   linia 1: { meta: { stadium, totalFrames, players: [{id, name, team}] } }
+//   kolejne: { f, score: [r, b], ball: {x,y,vx,vy},
+//              players: [{ id, team, x, y, vx, vy, input }] }
+//   input = bitmaska klawiszy (1=gora, 2=dol, 4=lewo, 8=prawo, 16=kop).
 //
-// UWAGA: pisane wg dokumentacji node-haxball, ale dokladne ksztalty obiektow
-// stanu moga sie roznic miedzy wersjami - przy pierwszym uruchomieniu na
-// prawdziwym pliku uzyj --inspect i w razie potrzeby dopasujemy akcesory.
+// Przetestowane end-to-end na prawdziwych nagraniach (w tym Futsal x7, 16 graczy).
 const fs = require("fs");
 
 const inputPath = process.argv[2];
 const outArg = process.argv[3];
 if (!inputPath) {
   console.error("Uzycie: node tools/convert-replay.js <plik.hbr2|folder> [wyjscie.jsonl|--inspect]");
-  console.error("  Folder: konwertuje wszystkie .hbr2 w srodku (pomija juz przekonwertowane).");
   process.exit(1);
 }
 
-// TRYB WSADOWY: folder z wieloma nagraniami - kazdy plik przerabiamy w osobnym
-// procesie (czysty stan readera), sekwencyjnie, z pominieciem juz zrobionych.
+// TRYB WSADOWY: folder z wieloma nagraniami - kazdy plik w osobnym procesie,
+// sekwencyjnie, z pominieciem juz przekonwertowanych.
 if (fs.existsSync(inputPath) && fs.statSync(inputPath).isDirectory()) {
   const { spawnSync } = require("child_process");
+  const path = require("path");
   const files = fs.readdirSync(inputPath).filter((f) => /\.hbr2?$/i.test(f)).sort();
   if (files.length === 0) {
     console.error(`Brak plikow .hbr2 w ${inputPath}`);
@@ -33,7 +34,7 @@ if (fs.existsSync(inputPath) && fs.statSync(inputPath).isDirectory()) {
   }
   let done = 0, skipped = 0, failed = 0;
   for (const f of files) {
-    const src = require("path").join(inputPath, f);
+    const src = path.join(inputPath, f);
     const dst = src.replace(/\.hbr2?$/i, "") + ".jsonl";
     if (fs.existsSync(dst)) { skipped++; continue; }
     const res = spawnSync(process.execPath, [__filename, src, dst], { stdio: "inherit", timeout: 660000 });
@@ -49,105 +50,66 @@ const outPath = inspectMode ? null : (outArg || inputPath.replace(/\.hbr2?$/i, "
 const { Replay } = require("node-haxball")();
 const data = fs.readFileSync(inputPath, null);
 
-// TRYB INSPEKCJI: synchroniczny parse calego pliku przez Replay.readAll -
-// zadnych callbackow i odtwarzania, po prostu struktura danych na stol.
+// TRYB INSPEKCJI: synchroniczny parse przez Replay.readAll - struktura na stol.
 if (inspectMode) {
   const rd = Replay.readAll(data);
-  console.log("=== ReplayData (klucze):", Object.keys(rd));
-  console.log("=== totalFrames:", rd.totalFrames, "version:", rd.version);
-  const room = rd.roomData;
-  console.log("=== roomData (klucze):", Object.keys(room || {}));
-  console.log("=== stadion:", room?.stadium?.name ?? "(brak pola stadium.name)");
-  const players = room?.players;
-  if (players && players.length) {
-    console.log("=== graczy w roomData:", players.length);
-    console.log("=== przykladowy gracz (klucze):", Object.keys(players[0]));
-    console.log("=== gracz JSON (400 znakow):", JSON.stringify(players[0]).slice(0, 400));
-  }
-  const events = rd.events;
-  if (events && events.length) {
-    console.log("=== zdarzen:", events.length);
-    const sample = events.slice(0, 8).map((e) => ({ frameNo: e.frameNo, keys: Object.keys(e) }));
-    console.log("=== pierwsze zdarzenia:", JSON.stringify(sample, null, 1).slice(0, 800));
-  }
-  const gs = room?.gameState;
-  console.log("=== roomData.gameState (klucze):", gs ? Object.keys(gs) : null);
+  console.log("totalFrames:", rd.totalFrames, "version:", rd.version);
+  console.log("stadion:", rd.roomData?.stadium?.name ?? "(?)");
+  console.log("graczy:", rd.roomData?.players?.length ?? 0);
+  console.log("zdarzen:", rd.events?.length ?? 0);
   process.exit(0);
 }
 
-// aktualny stan klawiszy kazdego gracza (aktualizowany zdarzeniami)
-const currentInputs = {};
 const rows = [];
-let inspected = false;
-
-function firstDefined(...vals) {
-  for (const v of vals) if (v !== undefined && v !== null) return v;
-  return null;
-}
-
-function extractDisc(obj) {
-  // rozne wersje node-haxball roznie nazywaja pola pozycji/predkosci
-  const pos = firstDefined(obj?.pos, obj?.position);
-  const speed = firstDefined(obj?.speed, obj?.velocity);
-  if (!pos || !speed) return null;
-  return { x: pos.x, y: pos.y, vx: speed.x, vy: speed.y };
-}
+let meta = null;
+let lastProgress = 0;
 
 const reader = Replay.read(data, {
-  onPlayerInputChange: (id, value) => {
-    currentInputs[id] = value;
-  },
   onGameTick: () => {
-    const state = reader.state;
     const gameState = reader.gameState;
-    if (!state || !gameState) return;
+    const state = reader.state;
+    if (!gameState || !state) return;
 
-    if (inspectMode && !inspected) {
-      inspected = true;
-      console.log("=== reader.state (klucze):", Object.keys(state));
-      console.log("=== reader.gameState (klucze):", Object.keys(gameState));
-      const players = firstDefined(state.players, state.playerList);
-      if (players && players[0]) {
-        console.log("=== przykladowy gracz (klucze):", Object.keys(players[0]));
-        console.log("=== gracz.disc:", JSON.stringify(players[0].disc ?? null)?.slice(0, 300));
-      }
-      finish(); // inspekcja = pierwszy tick wystarczy, nie mielimy calego nagrania
-      return;
+    if (!meta) {
+      meta = {
+        stadium: state.stadium?.name ?? gameState.stadium?.name ?? null,
+        totalFrames: reader.maxFrameNo,
+        players: (state.players || [])
+          .filter((p) => p.team?.id === 1 || p.team?.id === 2)
+          .map((p) => ({ id: p.id, name: p.name, team: p.team.id })),
+      };
     }
 
-    const fr = reader.getCurrentFrameNo();
-    if (fr % 10000 === 0) console.log(`  ...klatka ${fr}/${reader.maxFrameNo}`);
+    const f = reader.getCurrentFrameNo();
+    if (f - lastProgress >= 20000) {
+      lastProgress = f;
+      console.log(`  ...klatka ${f}/${reader.maxFrameNo}`);
+    }
 
-    const players = firstDefined(state.players, state.playerList) || [];
+    const ball = gameState.physicsState?.discs?.[0];
+    if (!ball?.pos) return;
+
     const row = {
-      f: reader.getCurrentFrameNo(),
-      score: [
-        firstDefined(gameState.redScore, state.redScore, 0),
-        firstDefined(gameState.blueScore, state.blueScore, 0),
-      ],
-      ball: null,
+      f,
+      score: [gameState.redScore | 0, gameState.blueScore | 0],
+      ball: { x: ball.pos.x, y: ball.pos.y, vx: ball.speed.x, vy: ball.speed.y },
       players: [],
     };
-
-    for (const p of players) {
-      const teamId = firstDefined(p.team?.id, p.team);
-      if (teamId !== 1 && teamId !== 2) continue; // pomijamy widzow
-      const disc = extractDisc(p.disc);
-      if (!disc) continue;
-      row.players.push({ id: p.id, team: teamId, ...disc, input: currentInputs[p.id] | 0 });
+    for (const p of state.players || []) {
+      const teamId = p.team?.id;
+      if (teamId !== 1 && teamId !== 2) continue; // widzowie
+      if (!p.disc?.pos) continue; // gracz bez dysku (np. wlasnie dolaczyl)
+      row.players.push({
+        id: p.id, team: teamId,
+        x: p.disc.pos.x, y: p.disc.pos.y,
+        vx: p.disc.speed.x, vy: p.disc.speed.y,
+        input: p.input | 0,
+      });
     }
-
-    // pilka: pierwszy dysk stanu fizyki, ktory nie nalezy do zadnego gracza
-    const discs = firstDefined(gameState.physicsState?.discs, gameState.discs);
-    if (discs && discs.length > 0) {
-      row.ball = extractDisc(discs[0]);
-    }
-
-    if (row.ball && row.players.length > 0) rows.push(row);
+    if (row.players.length > 0) rows.push(row);
   },
 }, {
-  // wlasny scheduler - przelatujemy nagranie tak szybko, jak da rade CPU,
-  // zamiast czekac w czasie rzeczywistym
+  // wlasny scheduler - nagranie przelatuje tak szybko jak CPU pozwala
   requestAnimationFrame: (cb) => setImmediate(cb),
   cancelAnimationFrame: (t) => clearImmediate(t),
 });
@@ -156,24 +118,18 @@ let finished = false;
 function finish() {
   if (finished) return;
   finished = true;
-  if (!inspectMode) {
-    fs.writeFileSync(outPath, rows.map((r) => JSON.stringify(r)).join("\n"));
-    console.log(`Zapisano ${rows.length} tickow do ${outPath}`);
-  } else {
-    console.log("Inspekcja zakonczona.");
-  }
-  reader.destroy();
+  const out = [JSON.stringify({ meta: meta ?? { stadium: null, totalFrames: reader.maxFrameNo, players: [] } })];
+  for (const r of rows) out.push(JSON.stringify(r));
+  fs.writeFileSync(outPath, out.join("\n"));
+  console.log(`Zapisano ${rows.length} tickow do ${outPath} (stadion: ${meta?.stadium ?? "?"})`);
+  try { reader.destroy(); } catch (e) { /* ignore */ }
   process.exit(0);
 }
 
-// Wg dokumentacji onEnd/onDestinationTimeReached to callbacki OBIEKTU readera
-// (przypisywane po utworzeniu), nie wpisy w liscie callbackow zdarzen gry.
 reader.onEnd = () => finish();
-reader.onDestinationTimeReached = () => finish();
 
 console.log(`Nagranie: ${inputPath}, dlugosc: ${(reader.length() / 1000).toFixed(0)}s, klatek: ${reader.maxFrameNo}`);
 reader.setSpeed(1000000);
-reader.setCurrentFrameNo(reader.maxFrameNo);
 
 // bezpiecznik - gdyby onEnd nie odpalil
 setTimeout(() => { console.error("Timeout po 10 min - zapisuje co mam."); finish(); }, 600000);
