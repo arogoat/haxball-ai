@@ -26,6 +26,7 @@ def make_eval_env(record: bool):
     )
     from obs import NormalizedObs
     from rewards import ShapedReward
+    from state_setters import RandomState
 
     if record:
         os.makedirs(RECORDINGS_DIR, exist_ok=True)
@@ -42,6 +43,9 @@ def make_eval_env(record: bool):
         tick_skip=TICK_SKIP,
         reward_fn=ShapedReward(),
         obs_builder=NormalizedObs(),
+        # te same losowe starty co w treningu - mecze eval sa dzieki temu
+        # rozne (deterministyczna polityka + staly start = 10x identyczny mecz)
+        state_setter=RandomState(kickoff_prob=0.2),
         terminal_conditions=[TimeoutCondition(EPISODE_STEPS), GoalScoredCondition()],
     )
 

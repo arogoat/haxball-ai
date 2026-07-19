@@ -31,6 +31,7 @@ def _make_haxball_env():
 
     from obs import NormalizedObs
     from rewards import ShapedReward
+    from state_setters import RandomState
 
     game = Game(
         enable_renderer=False,
@@ -44,6 +45,7 @@ def _make_haxball_env():
         tick_skip=TICK_SKIP,
         reward_fn=ShapedReward(),
         obs_builder=NormalizedObs(),
+        state_setter=RandomState(kickoff_prob=0.2),
         terminal_conditions=[TimeoutCondition(EPISODE_STEPS), GoalScoredCondition()],
     )
 

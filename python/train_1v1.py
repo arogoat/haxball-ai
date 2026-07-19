@@ -18,7 +18,9 @@ LOGS_DIR = os.path.join(BASE_DIR, "logs")
 LATEST_PATH = os.path.join(CHECKPOINTS_DIR, "latest.zip")
 
 N_ENVS = 4
-TOTAL_TIMESTEPS = 20_000_000
+# 20M zrobione w fazie 1 (sam kickoff); podbite na faze 2 (losowe starty +
+# nauka obrony). Trening wznawia sie z latest.zip i liczy dalej od 20M.
+TOTAL_TIMESTEPS = 60_000_000
 SNAPSHOT_EVERY = 100_000  # co tyle krokow: nowy przeciwnik w puli + checkpoint
 MAX_OPPONENTS = 20  # najstarsze snapshoty ponad limit sa usuwane
 
