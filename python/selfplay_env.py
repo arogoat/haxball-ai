@@ -61,7 +61,11 @@ class _OpponentPool:
         snaps = sorted(f for f in os.listdir(OPPONENTS_DIR) if f.endswith(".zip"))
         if not snaps:
             return None
-        if len(snaps) == 1 or random.random() < 0.8:
+        # 70/30 (bylo 80/20): wiecej meczow ze STARSZYMI, slabszymi snapshotami.
+        # Gdy bot gra niemal wylacznie z rownym sobie, atak przestaje sie oplacac
+        # (wyscig zbrojen konczy sie pasywna rownowaga) - starsi przeciwnicy
+        # przypominaja, ze aktywna gra wygrywa mecze.
+        if len(snaps) == 1 or random.random() < 0.7:
             return os.path.join(OPPONENTS_DIR, snaps[-1])
         return os.path.join(OPPONENTS_DIR, random.choice(snaps[:-1]))
 

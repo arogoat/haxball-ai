@@ -19,10 +19,17 @@ GOAL_HALF_HEIGHT = 64.0
 
 STEP_PENALTY = -0.01
 APPROACH_WEIGHT = 0.1 / 50.0  # (prev-new) w jednostkach mapy * ta waga
-BALL_TO_GOAL_WEIGHT = 0.1 / 50.0
+# x2 (bylo 0.002): pchanie pilki w strone bramki ma placic wyraznie, zeby
+# aktywna gra ofensywna byla atrakcyjniejsza niz krecenie sie po boisku
+BALL_TO_GOAL_WEIGHT = 0.2 / 50.0
 TOUCH_REWARD = 0.3
 GOAL_REWARD = 10.0
-TIMEOUT_PENALTY = -0.6
+# Bylo -0.6 i doprowadzilo do "tchorzliwej rownowagi": stracony gol -10 vs
+# remis -0.6 oznaczal, ze przy dwoch rownych przeciwnikach unikanie gry bylo
+# optymalne - po 43M krokow self-play OBAJ boci przestali chodzic do pilki
+# (70% pasywnych remisow w eval). Remis musi bolec na tyle, zeby ryzyko
+# ataku sie oplacalo, ale wciaz mniej niz stracony gol.
+TIMEOUT_PENALTY = -4.0
 
 
 def _ball_dist_to_goal(ball_pos: np.ndarray, team: int) -> float:

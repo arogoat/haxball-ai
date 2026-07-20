@@ -22,7 +22,9 @@ N_ENVS = 4
 # nauka obrony). Trening wznawia sie z latest.zip i liczy dalej od 20M.
 TOTAL_TIMESTEPS = 60_000_000
 SNAPSHOT_EVERY = 100_000  # co tyle krokow: nowy przeciwnik w puli + checkpoint
-MAX_OPPONENTS = 20  # najstarsze snapshoty ponad limit sa usuwane
+# 40 (bylo 20): szersza pula = wiecej roznorodnosci przeciwnikow, w tym starsi,
+# bardziej agresywni - antidotum na pasywna rownowage self-play
+MAX_OPPONENTS = 40
 
 
 class SelfPlayCallback(BaseCallback):
