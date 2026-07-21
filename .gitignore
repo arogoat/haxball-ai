@@ -7,8 +7,13 @@ trace-1v1.csv
 room-links-1v1.txt
 python/venv/
 python/opponents/
+python/opponents_2v2/
 python/checkpoints/
+python/checkpoints_2v2/
 python/logs/
+python/logs_2v2/
 python/recordings/
+python/train.log
+python/train_2v2.log
 __pycache__/
-replays/*.jsonl
+replays/**/*.jsonl
