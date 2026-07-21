@@ -88,11 +88,16 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
     // gdyby gra sie zatrzymala (np. reset), odpal ja ponownie
     room.onGameStop = () => { setTimeout(() => { try { room.startGame(); } catch (e) {} }, 500); };
 
-    // zamiatacz: co sekunde przenosi widzow (poza botem) do niebieskich, zeby
-    // nikt nie utknal w spectators przez wyscig zdarzen
+    // czlowiek -> niebiescy zaraz po dolaczeniu (sprawdzone: to dzialalo)
+    room.onPlayerJoin = (p) => {
+      try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
+    };
+
+    // zamiatacz-bezpiecznik: co sekunde przenosi kazdego nie-bota, kto NIE jest
+    // w niebieskich (czyli utknal w widzach), do niebieskich
     setInterval(() => {
       room.players.forEach((p) => {
-        if (p.id !== BOT_ID && p.team && p.team.id === 0) {
+        if (p.id !== BOT_ID && (!p.team || p.team.id !== BLUE)) {
           try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
         }
       });
