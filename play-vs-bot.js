@@ -19,7 +19,9 @@ const TOKEN = process.argv[2] || TOKENS_1V1[0];
 const BOT_PORT = 5555;
 const ACTION_REPEAT = 5;
 const RED = 1, BLUE = 2;
-const BOT_ID = 1;
+// wysokie ID - prawdziwi gracze dostaja ID sekwencyjnie od 1, wiec 99 nie
+// koliduje (przy niskim ID czlowiek "wchodzil w bota" i drozyny sie mieszaly)
+const BOT_ID = 99;
 
 // --- polaczenie z serwerem bota (Python) ---
 let botAction = [1, 1, 0]; // domyslnie: stoj, nie kopie (indeksy {0,1,2},{0,1})
@@ -88,17 +90,17 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
     // gdyby gra sie zatrzymala (np. reset), odpal ja ponownie
     room.onGameStop = () => { setTimeout(() => { try { room.startGame(); } catch (e) {} }, 500); };
 
-    // czlowiek -> niebiescy zaraz po dolaczeniu (sprawdzone: to dzialalo)
+    // czlowiek -> niebiescy zaraz po dolaczeniu
     room.onPlayerJoin = (p) => {
-      try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
+      if (p.id !== BOT_ID) { try { room.setPlayerTeam(p.id, BLUE); } catch (e) {} }
     };
 
-    // zamiatacz-bezpiecznik: co sekunde przenosi kazdego nie-bota, kto NIE jest
-    // w niebieskich (czyli utknal w widzach), do niebieskich
+    // zamiatacz samo-korygujacy: bot ZAWSZE czerwony, kazdy inny ZAWSZE niebieski
     setInterval(() => {
       room.players.forEach((p) => {
-        if (p.id !== BOT_ID && (!p.team || p.team.id !== BLUE)) {
-          try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
+        const want = p.id === BOT_ID ? RED : BLUE;
+        if (!p.team || p.team.id !== want) {
+          try { room.setPlayerTeam(p.id, want); } catch (e) {}
         }
       });
     }, 1000);
