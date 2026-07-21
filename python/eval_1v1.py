@@ -17,7 +17,7 @@ RECORDINGS_DIR = os.path.join(BASE_DIR, "recordings")
 from selfplay_env import TICK_SKIP, EPISODE_STEPS  # noqa: E402
 
 
-def make_eval_env(record: bool):
+def make_eval_env(record: bool, kickoff_only: bool = False):
     from ursinaxball import Game
     import haxballgym
     from haxballgym.utils.terminal_conditions.common_conditions import TimeoutCondition
@@ -41,9 +41,13 @@ def make_eval_env(record: bool):
         tick_skip=TICK_SKIP,
         reward_fn=ShapedReward(),
         obs_builder=NormalizedObs(),
-        # te same losowe starty co w treningu - mecze eval sa dzieki temu
-        # rozne (deterministyczna polityka + staly start = 10x identyczny mecz)
-        state_setter=RandomState(kickoff_prob=0.2),
+        # UWAGA: rekorder ursinaxball zapisuje tylko INPUTY graczy i odtwarza mecz
+        # przez ponowna symulacje - teleporty RandomState (bezposrednia zmiana
+        # pozycji) NIE trafiaja do nagrania, wiec odtworzony mecz to bzdury
+        # (gracze reaguja na pilke, ktorej nie ma). Do OGLADANIA nagran uzywaj
+        # --kickoff (starty kickoffowe odtwarzaja sie wiernie); losowe starty
+        # zostaja do statystyk.
+        state_setter=(RandomState(kickoff_prob=1.0) if kickoff_only else RandomState(kickoff_prob=0.2)),
         terminal_conditions=[TimeoutCondition(EPISODE_STEPS), FixedGoalScoredCondition()],
     )
 
@@ -56,6 +60,8 @@ def main():
     parser.add_argument("--no-rec", action="store_true")
     parser.add_argument("--stochastic", action="store_true",
                         help="akcje losowane z rozkladu polityki (jak w treningu) zamiast deterministycznych - dwie identyczne deterministyczne sieci potrafia wpasc w patowa petle")
+    parser.add_argument("--kickoff", action="store_true",
+                        help="wszystkie mecze od zwyklego kickoffu - JEDYNY tryb, w ktorym nagrania odtwarzaja sie wiernie (losowe starty psuja odtwarzanie)")
     args = parser.parse_args()
     det = not args.stochastic
 
@@ -68,7 +74,7 @@ def main():
     elif args.opponent != "random":
         opponent = PPO.load(args.opponent, device="cpu")
 
-    env = make_eval_env(record=not args.no_rec)
+    env = make_eval_env(record=not args.no_rec, kickoff_only=args.kickoff)
 
     record = not args.no_rec
     red_wins = blue_wins = draws = 0
