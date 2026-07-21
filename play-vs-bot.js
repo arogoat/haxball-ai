@@ -81,11 +81,30 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
     room.setPlayerTeam(BOT_ID, RED);
 
     // ludzie -> niebiescy; start gry gdy ktos wejdzie
-    room.onPlayerJoin = (p) => {
-      room.setPlayerTeam(p.id, BLUE);
-      room.startRecording();
-      room.startGame();
-    };
+    let started = false;
+    function ensureHumanPlaying(p) {
+      // z malym opoznieniem - setPlayerTeam tuz w onPlayerJoin bywa za wczesnie
+      setTimeout(() => {
+        try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
+        if (!started) {
+          started = true;
+          try { room.startRecording(); } catch (e) {}
+          try { room.startGame(); } catch (e) {}
+        }
+      }, 200);
+    }
+    room.onPlayerJoin = (p) => ensureHumanPlaying(p);
+
+    // zamiatacz: co sekunde przenosi widzow (poza botem) do niebieskich -
+    // gwarancja, ze nikt nie utknie w spectators przez wyscig zdarzen
+    setInterval(() => {
+      room.players.forEach((p) => {
+        if (p.id !== BOT_ID && p.team && p.team.id === 0) {
+          try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
+          if (!started) { started = true; try { room.startRecording(); } catch (e) {} try { room.startGame(); } catch (e) {} }
+        }
+      });
+    }, 1000);
     room.onPlayerLeave = () => {
       const humans = room.players.filter((p) => p.id !== BOT_ID && p.team && p.team.id !== 0);
       if (humans.length === 0) {
