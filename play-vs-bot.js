@@ -48,7 +48,7 @@ function askBot(state) {
   botConn.write(JSON.stringify(state) + "\n");
 }
 
-Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, token: TOKEN, showInRoomList: true }, {
+Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, token: TOKEN, showInRoomList: false }, {
   storage: { player_name: "host" },
   onRoomLink: (link) => {
     console.log("\n=== WEJDZ TU, ZEBY ZAGRAC Z BOTEM: ===\n" + link + "\n");
@@ -80,28 +80,20 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
     room.fakePlayerJoin(BOT_ID, "🤖 Bot", "pl", "🔴", "bot-conn", "bot-auth");
     room.setPlayerTeam(BOT_ID, RED);
 
-    // ludzie -> niebiescy; start gry gdy ktos wejdzie
-    let started = false;
-    function ensureHumanPlaying(p) {
-      // z malym opoznieniem - setPlayerTeam tuz w onPlayerJoin bywa za wczesnie
-      setTimeout(() => {
-        try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
-        if (!started) {
-          started = true;
-          try { room.startRecording(); } catch (e) {}
-          try { room.startGame(); } catch (e) {}
-        }
-      }, 200);
-    }
-    room.onPlayerJoin = (p) => ensureHumanPlaying(p);
+    // Gra startuje OD RAZU (bot vs pusta niebieska) i leci caly czas - dzieki
+    // temu wchodzacy czlowiek od razu gra, zamiast siedziec w niewystartowanym
+    // meczu (co wygladalo jak spectator).
+    try { room.startRecording(); } catch (e) {}
+    room.startGame();
+    // gdyby gra sie zatrzymala (np. reset), odpal ja ponownie
+    room.onGameStop = () => { setTimeout(() => { try { room.startGame(); } catch (e) {} }, 500); };
 
-    // zamiatacz: co sekunde przenosi widzow (poza botem) do niebieskich -
-    // gwarancja, ze nikt nie utknie w spectators przez wyscig zdarzen
+    // zamiatacz: co sekunde przenosi widzow (poza botem) do niebieskich, zeby
+    // nikt nie utknal w spectators przez wyscig zdarzen
     setInterval(() => {
       room.players.forEach((p) => {
         if (p.id !== BOT_ID && p.team && p.team.id === 0) {
           try { room.setPlayerTeam(p.id, BLUE); } catch (e) {}
-          if (!started) { started = true; try { room.startRecording(); } catch (e) {} try { room.startGame(); } catch (e) {} }
         }
       });
     }, 1000);
@@ -111,9 +103,6 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
         try { const rec = room.stopRecording(); if (rec) saveRecording(rec); } catch (e) {}
       }
     };
-    room.onTeamGoal = () => {};
-    room.onGameStop = () => { try { const rec = room.stopRecording(); if (rec) saveRecording(rec); } catch (e) {} };
-
     let tick = 0;
     room.onGameTick = () => {
       const ball = room.getBall();
