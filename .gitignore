@@ -17,3 +17,5 @@ python/train.log
 python/train_2v2.log
 __pycache__/
 replays/**/*.jsonl
+recordings-vs-bot/
+room-links-vs-bot.txt
