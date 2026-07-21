@@ -55,6 +55,22 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
     try { fs.appendFileSync("room-links-vs-bot.txt", new Date().toISOString() + " " + link + "\n"); } catch (e) {}
   },
   onOpen: (room) => {
+    // Pewne pobranie linka: zdarzenie onRoomLink bywa zawodne, a room.link to
+    // zwykla wlasciwosc. Odpytujemy co 2s az bedzie kompletny (?c=... nie null).
+    let linkShown = false, attempts = 0;
+    const linkPoll = setInterval(() => {
+      if (linkShown) { clearInterval(linkPoll); return; }
+      if (room.link && !room.link.includes("null")) {
+        linkShown = true; clearInterval(linkPoll);
+        console.log("\n=== WEJDZ TU, ZEBY ZAGRAC Z BOTEM: ===\n" + room.link + "\n");
+        try { fs.appendFileSync("room-links-vs-bot.txt", new Date().toISOString() + " " + room.link + "\n"); } catch (e) {}
+        return;
+      }
+      if (++attempts === 30) {
+        console.log("UWAGA: pokoj nie dostal linka po 60s - token najpewniej wygasl. Wygeneruj swiezy: https://www.haxball.com/headlesstoken");
+      }
+    }, 2000);
+
     const stadiums = Utils.getDefaultStadiums();
     room.setCurrentStadium(stadiums.find((s) => s.name === "Classic"));
     room.setTimeLimit(0);
