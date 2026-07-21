@@ -71,7 +71,7 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
       room.startGame();
     };
     room.onPlayerLeave = () => {
-      const humans = room.getPlayerList().filter((p) => p.id !== BOT_ID && p.team !== 0);
+      const humans = room.players.filter((p) => p.id !== BOT_ID && p.team && p.team.id !== 0);
       if (humans.length === 0) {
         try { const rec = room.stopRecording(); if (rec) saveRecording(rec); } catch (e) {}
       }
@@ -84,7 +84,7 @@ Room.create({ name: "Zagraj z AI (1v1)", noPlayer: true, maxPlayerCount: 6, toke
       const ball = room.getBall();
       const bot = room.getPlayerDisc(BOT_ID);
       // przeciwnik = pierwszy zywy czlowiek (niebieski)
-      const humanP = room.getPlayerList().find((p) => p.id !== BOT_ID && p.team === BLUE);
+      const humanP = room.players.find((p) => p.id !== BOT_ID && p.team && p.team.id === BLUE);
       const opp = humanP ? room.getPlayerDisc(humanP.id) : null;
       if (!ball || !bot) return;
 
